@@ -1,0 +1,149 @@
+% crear un time scope con 2 canales de entrada (uno para cada amplificador), una frecuencia de muestreo 
+% de 256 Hz y una longitud de búfer de 10 segundos (2560 muestras por canal)
+scope_handle = dsp.TimeScope(5,256, 'BufferLength', 2560,...
+    'YLimits', [-5 5], 'TimeSpan', 10, 'LayoutDimensions', [5,1],...
+    'ReduceUpdates',true, 'YLabel','Amplitude [uV]');
+% cambiar al objeto del segundo eje para cambiar el límite y la etiqueta
+set(scope_handle, 'ActiveDisplay',5, 'YLimits', [-5 5], 'YLabel','Amplitude [µV]');
+drawnow
+% create gtecDeviceInterface object
+gds_interface = gtecDeviceInterface();
+
+% definir la configuración de la conexión (loopback)
+gds_interface.IPAddressHost = '127.0.0.1';
+gds_interface.IPAddressLocal = '127.0.0.1';
+gds_interface.LocalPort = 50224;
+gds_interface.HostPort = 50223;
+
+% get connected devices
+connected_devices = gds_interface.GetConnectedDevices();
+
+% crear array de objetos de configuración g.USBamp (la primera configuración es maestra, 
+% la segunda es esclava
+gusbamp_configs(1,1:2) = gUSBampDeviceConfiguration();
+% establecer números de serie en las configuraciones de dispositivos g.USBamp
+%% master
+gusbamp_configs(1,1).Name = connected_devices(1,1).Name;
+%% esclavo
+gusbamp_configs(1,2).Name = connected_devices(1,2).Name;
+%%
+
+% establecer la configuración para utilizar las funciones de la interfaz gds 
+% que requieren el dispositivo conexión
+gds_interface.DeviceConfigurations = gusbamp_configs;
+
+% obtener los canales disponibles
+available_channels_master = gds_interface.GetAvailableChannels(connected_devices(1,1).Name);
+available_channels_slave = gds_interface.GetAvailableChannels(connected_devices(1,2).Name);
+available_filters = gds_interface.GetAvailableFilters((connected_devices(1,1).Name));
+
+
+for i=1:size(gusbamp_configs,2)
+    gusbamp_configs(1,i).SamplingRate = 256;
+    gusbamp_configs(1,i).NumberOfScans = 8;
+    gusbamp_configs(1,i).CommonGround = true(1,4);
+    gusbamp_configs(1,i).CommonReference = true(1,4);
+    gusbamp_configs(1,i).ShortCutEnabled = false;
+    gusbamp_configs(1,i).CounterEnabled = false;
+    gusbamp_configs(1,i).TriggerEnabled = false;
+
+    for j=1:size(gusbamp_configs(1,i).Channels,2)
+        if (available_channels_master(1,j))
+            gusbamp_configs(1,i).Channels(1,j).Available = true;
+            gusbamp_configs(1,i).Channels(1,j).Acquire = true;
+            
+            gusbamp_configs(1,i).Channels(1,j).BandpassFilterIndex = -1;
+            gusbamp_configs(1,i).Channels(1,j).NotchFilterIndex = -1;
+            % do not use a bipolar channel
+            gusbamp_configs(1,i).Channels(1,j).BipolarChannel = 0;
+        end
+    end
+end
+    
+% Aplicar la configuración a la interfaz GDS
+gds_interface.DeviceConfigurations = gusbamp_configs;
+% establecer la configuración proporcionada en DeviceConfigurations
+gds_interface.SetConfiguration();
+%% Iniciar la adquisición de datos
+gds_interface.StartDataAcquisition();
+
+% Crear una figura separada para el botón de parada
+stop_button_fig = figure;
+set(stop_button_fig, 'KeyPressFcn', @keypress_callback);
+uicontrol(stop_button_fig, 'Style', 'pushbutton', 'String', 'Stop', 'Position', [20, 20, 60, 20], 'Callback', @stop_callback);
+
+% Inicializar detencion
+global stop_flag;
+stop_flag = false;
+
+% Inicializar las variables de almacenamiento de datos
+recorded_data = [];
+% registra los datos durante 10 segundos y traza el primer canal analógico adquirido.
+samples_acquired = 0;
+
+% Graba datos hasta que se pulsa el botón 
+    while ~stop_flag && isvalid(scope_handle)
+        try
+            [scans_received, data] = gds_interface.GetData(8);
+        catch ME
+            disp(ME.message);
+            break;
+        end
+
+        % Añadir los datos adquiridos a la matriz de datos registrados
+        recorded_data = [recorded_data; data];
+        samples_acquired = samples_acquired + scans_received;
+        
+        % Visualización de canales analógicos en el ámbito temporal
+        step(scope_handle, data(:,1),data(:,5) ,data(:,9)  ,data(:,13),data(:,17));
+        samples_acquired = samples_acquired + scans_received;
+
+        
+        drawnow; % Update the figure window
+    end
+
+
+
+%% Detener la adquisicion de datos
+gds_interface.StopDataAcquisition();
+
+
+recorded_data = transpose(recorded_data);
+    
+
+%%
+% Limpiar
+delete(gds_interface)
+
+%% Filtrar
+
+clear gds_interface gusbamp_config scope_handle;
+    
+ch=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16];
+
+a=recorded_data(ch,:);
+b=double(a);
+bpFilt = designfilt('bandpassiir','FilterOrder',14, ...
+'HalfPowerFrequency1',0.5,'HalfPowerFrequency2',45, ...
+'SampleRate',256);
+c=(filtfilt(bpFilt,b'));
+figure
+e1=subplot(2,1,1);
+plot(a')
+e2=subplot(2,1,2);
+plot(c)
+
+linkaxes([e1 e2],'x')
+ylim([-500 800])
+
+
+
+close(stop_button_fig);  % Close the stop_button_fig
+% Callback function for the stop button
+function stop_callback(~, ~)
+    global stop_flag;
+    stop_flag = true;
+end
+
+
+
