@@ -113,18 +113,11 @@ clear gds_interface gusbamp_config scope_handle;
 
 %% APLICACION DE FILTRO Y PRESENTACION DE DATOS 
 
-
 ch=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16]; %canales a filtrar
+ch2=[17]; % canal de marcadores
 
 a=recorded_data(ch,:); %variable donde se almacenan los canales 1-16
-b=double(a); % ): La matriz a se convierte a tipo de datos double y se almacena en la matriz b, necesario para operaciones de filtrado que requieren datos de tipo double.
-
-%% DISENO DEL FILTRO
-ch=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16]; %canales a filtrar
-ch2=[17];
-
-a=recorded_data(ch,:); %variable donde se almacenan los canales 1-16
-a17=recorded_data(ch2,:); %variable de el canal 17 marcadores
+a17=recorded_data(ch2,:); %variable donde se almacena el canal 17 marcadores
 b=double(a); % La matriz a se convierte a tipo de datos double y se almacena en la matriz b, necesario para operaciones de filtrado que requieren datos de tipo double.
 aa17=double(a17'); %convierte los datos del canal adicional a tipo double y transpone la matriz.
 
