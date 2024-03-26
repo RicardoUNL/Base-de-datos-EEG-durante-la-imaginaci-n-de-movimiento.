@@ -120,27 +120,54 @@ a=recorded_data(ch,:); %variable donde se almacenan los canales 1-16
 b=double(a); % ): La matriz a se convierte a tipo de datos double y se almacena en la matriz b, necesario para operaciones de filtrado que requieren datos de tipo double.
 
 %% DISENO DEL FILTRO
+ch=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16]; %canales a filtrar
+ch2=[17];
+
+a=recorded_data(ch,:); %variable donde se almacenan los canales 1-16
+a17=recorded_data(ch2,:); %variable de el canal 17 marcadores
+b=double(a); % La matriz a se convierte a tipo de datos double y se almacena en la matriz b, necesario para operaciones de filtrado que requieren datos de tipo double.
+aa17=double(a17'); %convierte los datos del canal adicional a tipo double y transpone la matriz.
+
+%% DISENO DEL FILTRO PASA BANDA
+%  define un filtro pasa banda de orden 14 con una frecuencia de corte de 0.5 a 45 Hz
 bpFilt = designfilt('bandpassiir','FilterOrder',14, ...
 'HalfPowerFrequency1',0.5,'HalfPowerFrequency2',45, ...
 'SampleRate',256); 
+c=(filtfilt(bpFilt,b')); % filtra los datos de los canales utilizando el filtro diseñado.
+s=[c aa17]; % concatena los datos filtrados con los del canal de marcadores
 
-c=(filtfilt(bpFilt,b'));
-figure
-e1=subplot(2,1,1);
+figure % Se crea una figura y se generan tres subgráficos para mostrar:
+e1=subplot(3,1,1);
 plot(a')
-e2=subplot(2,1,2);
+xlabel('Tiempo')
+ylabel('Amplitud (uV)')
+title('Canales')
+grid on
+%
+e2=subplot(3,1,2);
 plot(c)
+xlabel('Tiempo')
+ylabel('Amplitud (uV)')
+title('Canales Filtrados')
+grid on
+%
+e3=subplot(3,1,3);
+plot(s)
+xlabel('Tiempo')
+ylabel('Amplitud (uV)')
+title('Canales con marcadores')
+grid on
+axis([1,length(s),-800,800])
+% Se ajustan los ejes, etiquetas y títulos de los gráficos.
+linkaxes([e1 e2 e3],'x') % vincula los ejes x de los subgráficos.
+ylim([-500 800]) % establece el rango de valores en el eje y para los subgráficos.
 
-linkaxes([e1 e2],'x')
-ylim([-500 800])
-
-
-
-close(stop_button_fig);  % Close the stop_button_fig
-% Callback function for the stop button
-function stop_callback(~, ~)
-    global stop_flag;
-    stop_flag = true;
+close(stop_button_fig);  % cerrar la figura del botón detener 
+% Función de devolución de llamada para el botón de parada
+function stop_callback(~, ~) % define la función con dos argumentos de entrada, pero en este caso, los argumentos no se utilizan, por eso se usan ~ para indicar que se ignoran.
+    global stop_flag; % declara la variable stop_flag como global, lo que significa que se puede acceder y modificar desde cualquier parte del código.
+    stop_flag = true; % establece la variable stop_flag en true, que se utiliza para detener el proceso de adquisición en el código principal cuando se presiona el botón de parada.
 end
+
 
 
